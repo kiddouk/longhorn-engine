@@ -7,6 +7,11 @@ platform:
   arch: amd64
 
 steps:
+- name: fetch
+  image: alpine/git
+  commands:
+  - git fetch --tags
+
 - name: build
   pull: default
   image: rancher/dapper:v0.4.1
@@ -34,7 +39,7 @@ steps:
     event:
     - push
 
-- name: publish-staging-image
+- name: publish-tagged-image
   image: plugins/docker
   settings:
     custom_dns: 1.1.1.1
@@ -42,14 +47,31 @@ steps:
     password:
       from_secret: docker_password
     repo: longhornio/longhorn-engine
-    tag: staging
+    tag: "${DRONE_TAG}"
     username:
       from_secret: docker_username
   when:
     branch:
-    - staging
+    - master
     event:
-    - push
+    - tag
+
+- name: slack_notify
+  image: plugins/slack
+  settings:
+    template: "Build {{build.link}} failed.\n"
+    username: Drone_Publish
+    webhook:
+      from_secret: slack_webhook
+  when:
+    event:
+      exclude:
+      - pull_request
+    instance:
+      include:
+      - drone-publish.rancher.io
+    status:
+      - failure
 
 volumes:
 - name: socket

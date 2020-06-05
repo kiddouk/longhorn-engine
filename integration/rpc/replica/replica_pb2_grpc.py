@@ -16,72 +16,77 @@ class ReplicaServiceStub(object):
       channel: A grpc.Channel.
     """
     self.ReplicaCreate = channel.unary_unary(
-        '/rpc.ReplicaService/ReplicaCreate',
+        '/ptypes.ReplicaService/ReplicaCreate',
         request_serializer=replica__pb2.ReplicaCreateRequest.SerializeToString,
         response_deserializer=replica__pb2.Replica.FromString,
         )
     self.ReplicaDelete = channel.unary_unary(
-        '/rpc.ReplicaService/ReplicaDelete',
+        '/ptypes.ReplicaService/ReplicaDelete',
         request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
         response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
         )
     self.ReplicaGet = channel.unary_unary(
-        '/rpc.ReplicaService/ReplicaGet',
+        '/ptypes.ReplicaService/ReplicaGet',
         request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
         response_deserializer=replica__pb2.Replica.FromString,
         )
     self.ReplicaOpen = channel.unary_unary(
-        '/rpc.ReplicaService/ReplicaOpen',
+        '/ptypes.ReplicaService/ReplicaOpen',
         request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
         response_deserializer=replica__pb2.Replica.FromString,
         )
     self.ReplicaClose = channel.unary_unary(
-        '/rpc.ReplicaService/ReplicaClose',
+        '/ptypes.ReplicaService/ReplicaClose',
         request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
         response_deserializer=replica__pb2.Replica.FromString,
         )
     self.ReplicaReload = channel.unary_unary(
-        '/rpc.ReplicaService/ReplicaReload',
+        '/ptypes.ReplicaService/ReplicaReload',
         request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
         response_deserializer=replica__pb2.Replica.FromString,
         )
     self.ReplicaRevert = channel.unary_unary(
-        '/rpc.ReplicaService/ReplicaRevert',
+        '/ptypes.ReplicaService/ReplicaRevert',
         request_serializer=replica__pb2.ReplicaRevertRequest.SerializeToString,
         response_deserializer=replica__pb2.Replica.FromString,
         )
     self.ReplicaSnapshot = channel.unary_unary(
-        '/rpc.ReplicaService/ReplicaSnapshot',
+        '/ptypes.ReplicaService/ReplicaSnapshot',
         request_serializer=replica__pb2.ReplicaSnapshotRequest.SerializeToString,
         response_deserializer=replica__pb2.Replica.FromString,
         )
+    self.ReplicaExpand = channel.unary_unary(
+        '/ptypes.ReplicaService/ReplicaExpand',
+        request_serializer=replica__pb2.ReplicaExpandRequest.SerializeToString,
+        response_deserializer=replica__pb2.Replica.FromString,
+        )
     self.DiskRemove = channel.unary_unary(
-        '/rpc.ReplicaService/DiskRemove',
+        '/ptypes.ReplicaService/DiskRemove',
         request_serializer=replica__pb2.DiskRemoveRequest.SerializeToString,
         response_deserializer=replica__pb2.Replica.FromString,
         )
     self.DiskReplace = channel.unary_unary(
-        '/rpc.ReplicaService/DiskReplace',
+        '/ptypes.ReplicaService/DiskReplace',
         request_serializer=replica__pb2.DiskReplaceRequest.SerializeToString,
         response_deserializer=replica__pb2.Replica.FromString,
         )
     self.DiskPrepareRemove = channel.unary_unary(
-        '/rpc.ReplicaService/DiskPrepareRemove',
+        '/ptypes.ReplicaService/DiskPrepareRemove',
         request_serializer=replica__pb2.DiskPrepareRemoveRequest.SerializeToString,
         response_deserializer=replica__pb2.DiskPrepareRemoveReply.FromString,
         )
     self.DiskMarkAsRemoved = channel.unary_unary(
-        '/rpc.ReplicaService/DiskMarkAsRemoved',
+        '/ptypes.ReplicaService/DiskMarkAsRemoved',
         request_serializer=replica__pb2.DiskMarkAsRemovedRequest.SerializeToString,
         response_deserializer=replica__pb2.Replica.FromString,
         )
     self.RebuildingSet = channel.unary_unary(
-        '/rpc.ReplicaService/RebuildingSet',
+        '/ptypes.ReplicaService/RebuildingSet',
         request_serializer=replica__pb2.RebuildingSetRequest.SerializeToString,
         response_deserializer=replica__pb2.Replica.FromString,
         )
     self.RevisionCounterSet = channel.unary_unary(
-        '/rpc.ReplicaService/RevisionCounterSet',
+        '/ptypes.ReplicaService/RevisionCounterSet',
         request_serializer=replica__pb2.RevisionCounterSetRequest.SerializeToString,
         response_deserializer=replica__pb2.Replica.FromString,
         )
@@ -141,6 +146,13 @@ class ReplicaServiceServicer(object):
     raise NotImplementedError('Method not implemented!')
 
   def ReplicaSnapshot(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+  def ReplicaExpand(self, request, context):
     # missing associated documentation comment in .proto file
     pass
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -232,6 +244,11 @@ def add_ReplicaServiceServicer_to_server(servicer, server):
           request_deserializer=replica__pb2.ReplicaSnapshotRequest.FromString,
           response_serializer=replica__pb2.Replica.SerializeToString,
       ),
+      'ReplicaExpand': grpc.unary_unary_rpc_method_handler(
+          servicer.ReplicaExpand,
+          request_deserializer=replica__pb2.ReplicaExpandRequest.FromString,
+          response_serializer=replica__pb2.Replica.SerializeToString,
+      ),
       'DiskRemove': grpc.unary_unary_rpc_method_handler(
           servicer.DiskRemove,
           request_deserializer=replica__pb2.DiskRemoveRequest.FromString,
@@ -264,5 +281,5 @@ def add_ReplicaServiceServicer_to_server(servicer, server):
       ),
   }
   generic_handler = grpc.method_handlers_generic_handler(
-      'rpc.ReplicaService', rpc_method_handlers)
+      'ptypes.ReplicaService', rpc_method_handlers)
   server.add_generic_rpc_handlers((generic_handler,))

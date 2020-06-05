@@ -3,6 +3,7 @@ package s3
 import (
 	"fmt"
 	"io"
+	"net/http"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -14,6 +15,7 @@ import (
 type Service struct {
 	Region string
 	Bucket string
+	Client *http.Client
 }
 
 func (s *Service) New() (*s3.S3, error) {
@@ -24,14 +26,22 @@ func (s *Service) New() (*s3.S3, error) {
 		config.Endpoint = aws.String(endpoints)
 		config.S3ForcePathStyle = aws.Bool(true)
 	}
-	return s3.New(session.New(), config), nil
+
+	if s.Client != nil {
+		config.HTTPClient = s.Client
+	}
+
+	ses, err := session.NewSession(config)
+	if err != nil {
+		return nil, err
+	}
+	return s3.New(ses), nil
 }
 
 func (s *Service) Close() {
 }
 
-func parseAwsError(resp string, err error) error {
-	log.Errorln(resp)
+func parseAwsError(err error) error {
 	if awsErr, ok := err.(awserr.Error); ok {
 		message := fmt.Sprintln("AWS Error: ", awsErr.Code(), awsErr.Message(), awsErr.OrigErr())
 		if reqErr, ok := err.(awserr.RequestFailure); ok {
@@ -57,7 +67,8 @@ func (s *Service) ListObjects(key, delimiter string) ([]*s3.Object, []*s3.Common
 	}
 	resp, err := svc.ListObjects(params)
 	if err != nil {
-		return nil, nil, parseAwsError(resp.String(), err)
+		return nil, nil, fmt.Errorf("failed to list objects with param: %+v response: %v error: %v",
+			params, resp.String(), parseAwsError(err))
 	}
 	return resp.Contents, resp.CommonPrefixes, nil
 }
@@ -74,7 +85,8 @@ func (s *Service) HeadObject(key string) (*s3.HeadObjectOutput, error) {
 	}
 	resp, err := svc.HeadObject(params)
 	if err != nil {
-		return nil, parseAwsError(resp.String(), err)
+		return nil, fmt.Errorf("failed to get metadata for object: %v response: %v error: %v",
+			key, resp.String(), parseAwsError(err))
 	}
 	return resp, nil
 }
@@ -94,7 +106,8 @@ func (s *Service) PutObject(key string, reader io.ReadSeeker) error {
 
 	resp, err := svc.PutObject(params)
 	if err != nil {
-		return parseAwsError(resp.String(), err)
+		return fmt.Errorf("failed to put object: %v response: %v error: %v",
+			key, resp.String(), parseAwsError(err))
 	}
 	return nil
 }
@@ -113,28 +126,18 @@ func (s *Service) GetObject(key string) (io.ReadCloser, error) {
 
 	resp, err := svc.GetObject(params)
 	if err != nil {
-		return nil, parseAwsError(resp.String(), err)
+		return nil, fmt.Errorf("failed to get object: %v response: %v error: %v",
+			key, resp.String(), parseAwsError(err))
 	}
 
 	return resp.Body, nil
 }
 
-func (s *Service) DeleteObjects(keys []string) error {
-	var keyList []string
-	totalSize := 0
-	for _, key := range keys {
-		contents, _, err := s.ListObjects(key, "")
-		if err != nil {
-			return fmt.Errorf("failed to list object %v before removing it: %v", key, err)
-		}
-		size := len(contents)
-		if size == 0 {
-			continue
-		}
-		totalSize += size
-		for _, obj := range contents {
-			keyList = append(keyList, *obj.Key)
-		}
+func (s *Service) DeleteObjects(key string) error {
+
+	objects, _, err := s.ListObjects(key, "")
+	if err != nil {
+		return fmt.Errorf("failed to list objects with prefix %v before removing them error: %v", key, err)
 	}
 
 	svc, err := s.New()
@@ -143,26 +146,23 @@ func (s *Service) DeleteObjects(keys []string) error {
 	}
 	defer s.Close()
 
-	identifiers := make([]*s3.ObjectIdentifier, totalSize)
-	for i, k := range keyList {
-		identifiers[i] = &s3.ObjectIdentifier{
-			Key: aws.String(k),
-		}
-	}
-	if len(identifiers) != 0 {
-		quiet := true
-		params := &s3.DeleteObjectsInput{
+	var deletionFailures []string
+	for _, object := range objects {
+		resp, err := svc.DeleteObject(&s3.DeleteObjectInput{
 			Bucket: aws.String(s.Bucket),
-			Delete: &s3.Delete{
-				Objects: identifiers,
-				Quiet:   &quiet,
-			},
-		}
+			Key:    object.Key,
+		})
 
-		resp, err := svc.DeleteObjects(params)
 		if err != nil {
-			return fmt.Errorf("failed to remove objects with param %+v: %v", params, parseAwsError(resp.String(), err))
+			log.Errorf("failed to delete object: %v response: %v error: %v",
+				aws.StringValue(object.Key), resp.String(), parseAwsError(err))
+			deletionFailures = append(deletionFailures, aws.StringValue(object.Key))
 		}
 	}
+
+	if len(deletionFailures) > 0 {
+		return fmt.Errorf("failed to delete objects %v", deletionFailures)
+	}
+
 	return nil
 }

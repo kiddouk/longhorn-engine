@@ -4,7 +4,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/longhorn/backupstore"
 	"github.com/longhorn/backupstore/util"
@@ -46,23 +48,21 @@ func (f *FileSystemOperator) FileExists(filePath string) bool {
 	return f.FileSize(filePath) >= 0
 }
 
-func (f *FileSystemOperator) Remove(names ...string) error {
-	for _, name := range names {
-		if err := os.RemoveAll(f.LocalPath(name)); err != nil {
-			return err
+func (f *FileSystemOperator) Remove(path string) error {
+	if err := os.RemoveAll(f.LocalPath(path)); err != nil {
+		return err
+	}
+	//Also automatically cleanup upper level directories
+	dir := f.LocalPath(path)
+	for i := 0; i < MaxCleanupLevel; i++ {
+		dir = filepath.Dir(dir)
+		// Don't clean above backupstore base
+		if strings.HasSuffix(dir, backupstore.GetBackupstoreBase()) {
+			break
 		}
-		//Also automatically cleanup upper level directories
-		dir := f.LocalPath(name)
-		for i := 0; i < MaxCleanupLevel; i++ {
-			dir = filepath.Dir(dir)
-			// Don't clean above backupstore base
-			if strings.HasSuffix(dir, backupstore.GetBackupstoreBase()) {
-				break
-			}
-			// If directory is not empty, then we don't need to continue
-			if err := os.Remove(dir); err != nil {
-				break
-			}
+		// If directory is not empty, then we don't need to continue
+		if err := os.Remove(dir); err != nil {
+			break
 		}
 	}
 	return nil
@@ -77,10 +77,8 @@ func (f *FileSystemOperator) Read(src string) (io.ReadCloser, error) {
 }
 
 func (f *FileSystemOperator) Write(dst string, rs io.ReadSeeker) error {
-	tmpFile := dst + ".tmp"
-	if f.FileExists(tmpFile) {
-		f.Remove(tmpFile)
-	}
+	// we append the timestamp to the tmp files so that we should never have 2 backups using the same tmp file
+	tmpFile := dst + ".tmp" + "." + strconv.FormatInt(time.Now().UnixNano(), 10)
 	if err := f.preparePath(dst); err != nil {
 		return err
 	}
@@ -88,15 +86,19 @@ func (f *FileSystemOperator) Write(dst string, rs io.ReadSeeker) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+
 	_, err = io.Copy(file, rs)
+	if err != nil {
+		_ = file.Close()
+		return err
+	}
+
+	// we close the file here to force nfs to sync the data to stable storage
+	err = file.Close()
 	if err != nil {
 		return err
 	}
 
-	if f.FileExists(dst) {
-		f.Remove(dst)
-	}
 	return os.Rename(f.LocalPath(tmpFile), f.LocalPath(dst))
 }
 
@@ -114,7 +116,7 @@ func (f *FileSystemOperator) List(path string) ([]string, error) {
 }
 
 func (f *FileSystemOperator) Upload(src, dst string) error {
-	tmpDst := dst + ".tmp"
+	tmpDst := dst + ".tmp" + "." + strconv.FormatInt(time.Now().UnixNano(), 10)
 	if f.FileExists(tmpDst) {
 		f.Remove(tmpDst)
 	}

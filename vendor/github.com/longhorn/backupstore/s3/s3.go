@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/longhorn/backupstore"
+	"github.com/longhorn/backupstore/http"
 	"github.com/sirupsen/logrus"
 )
 
@@ -56,6 +57,15 @@ func initFunc(destURL string) (backupstore.BackupStoreDriver, error) {
 		return nil, fmt.Errorf("Invalid URL. Must be either s3://bucket@region/path/, or s3://bucket/path")
 	}
 
+	// add custom ca to http client that is used by s3 service
+	if customCerts := getCustomCerts(); customCerts != nil {
+		client, err := http.GetClientWithCustomCerts(customCerts)
+		if err != nil {
+			return nil, err
+		}
+		b.service.Client = client
+	}
+
 	//Leading '/' can cause mystery problems for s3
 	b.path = strings.TrimLeft(b.path, "/")
 
@@ -72,6 +82,16 @@ func initFunc(destURL string) (backupstore.BackupStoreDriver, error) {
 
 	log.Debugf("Loaded driver for %v", b.destURL)
 	return b, nil
+}
+
+func getCustomCerts() []byte {
+	// Certificates in PEM format (base64)
+	certs := os.Getenv("AWS_CERT")
+	if certs == "" {
+		return nil
+	}
+
+	return []byte(certs)
 }
 
 func (s *BackupStoreDriver) Kind() string {
@@ -135,15 +155,8 @@ func (s *BackupStoreDriver) FileSize(filePath string) int64 {
 	return *head.ContentLength
 }
 
-func (s *BackupStoreDriver) Remove(names ...string) error {
-	if len(names) == 0 {
-		return nil
-	}
-	paths := make([]string, len(names))
-	for i, name := range names {
-		paths[i] = s.updatePath(name)
-	}
-	return s.service.DeleteObjects(paths)
+func (s *BackupStoreDriver) Remove(path string) error {
+	return s.service.DeleteObjects(s.updatePath(path))
 }
 
 func (s *BackupStoreDriver) Read(src string) (io.ReadCloser, error) {

@@ -1,12 +1,10 @@
-from common import (  # NOQA
-    grpc_controller_no_frontend,  # NOQA
-    grpc_replica1, grpc_replica2,  # NOQA
+from common.core import (  # NOQA
     open_replica,
     get_blockdev, random_string, verify_read, verify_data,
-    start_engine_frontend, shutdown_engine_frontend,
 )
-from setting import (
-    VOLUME_NO_FRONTEND_NAME, ENGINE_NO_FRONTEND_NAME,
+from common.constants import (
+    VOLUME_NO_FRONTEND_NAME,
+    FRONTEND_TGT_BLOCKDEV,
 )
 
 
@@ -27,7 +25,7 @@ def test_frontend_switch(grpc_controller_no_frontend,  # NOQA
     assert v.replicaCount == 2
     assert v.frontend == ""
 
-    start_engine_frontend(ENGINE_NO_FRONTEND_NAME)
+    grpc_controller_no_frontend.volume_frontend_start(FRONTEND_TGT_BLOCKDEV)
 
     dev = get_blockdev(volume=VOLUME_NO_FRONTEND_NAME)
 
@@ -35,11 +33,11 @@ def test_frontend_switch(grpc_controller_no_frontend,  # NOQA
     data_offset = 1024
     verify_data(dev, data_offset, data)
 
-    shutdown_engine_frontend(ENGINE_NO_FRONTEND_NAME)
+    grpc_controller_no_frontend.volume_frontend_shutdown()
 
-    start_engine_frontend(ENGINE_NO_FRONTEND_NAME)
+    grpc_controller_no_frontend.volume_frontend_start(FRONTEND_TGT_BLOCKDEV)
 
     dev = get_blockdev(volume=VOLUME_NO_FRONTEND_NAME)
     verify_read(dev, data_offset, data)
 
-    shutdown_engine_frontend(ENGINE_NO_FRONTEND_NAME)
+    grpc_controller_no_frontend.volume_frontend_shutdown()

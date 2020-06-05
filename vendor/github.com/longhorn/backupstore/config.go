@@ -29,8 +29,7 @@ func getBackupConfigName(id string) string {
 }
 
 func loadConfigInBackupStore(filePath string, driver BackupStoreDriver, v interface{}) error {
-	size := driver.FileSize(filePath)
-	if size < 0 {
+	if !driver.FileExists(filePath) {
 		return fmt.Errorf("cannot find %v in backupstore", filePath)
 	}
 	rc, err := driver.Read(filePath)
@@ -89,7 +88,7 @@ func getVolumePath(volumeName string) string {
 	checksum := util.GetChecksum([]byte(volumeName))
 	volumeLayer1 := checksum[0:VOLUME_SEPARATE_LAYER1]
 	volumeLayer2 := checksum[VOLUME_SEPARATE_LAYER1:VOLUME_SEPARATE_LAYER2]
-	return filepath.Join(backupstoreBase, VOLUME_DIRECTORY, volumeLayer1, volumeLayer2, volumeName)
+	return filepath.Join(backupstoreBase, VOLUME_DIRECTORY, volumeLayer1, volumeLayer2, volumeName) + "/"
 }
 
 func getVolumeFilePath(volumeName string) string {
@@ -162,6 +161,10 @@ func getBackupConfigPath(backupName, volumeName string) string {
 	return filepath.Join(path, fileName)
 }
 
+func isBackupInProgress(backup *Backup) bool {
+	return backup != nil && backup.CreatedTime == ""
+}
+
 func backupExists(backupName, volumeName string, bsDriver BackupStoreDriver) bool {
 	return bsDriver.FileExists(getBackupConfigPath(backupName, volumeName))
 }
@@ -175,13 +178,10 @@ func loadBackup(backupName, volumeName string, bsDriver BackupStoreDriver) (*Bac
 }
 
 func saveBackup(backup *Backup, bsDriver BackupStoreDriver) error {
-	filePath := getBackupConfigPath(backup.Name, backup.VolumeName)
-	if bsDriver.FileExists(filePath) {
-		log.Warnf("Snapshot configuration file %v already exists, would remove it\n", filePath)
-		if err := bsDriver.Remove(filePath); err != nil {
-			return err
-		}
+	if backup.VolumeName == "" {
+		return fmt.Errorf("missing volume specifier for backup: %v", backup.Name)
 	}
+	filePath := getBackupConfigPath(backup.Name, backup.VolumeName)
 	if err := saveConfigInBackupStore(filePath, bsDriver, backup); err != nil {
 		return err
 	}

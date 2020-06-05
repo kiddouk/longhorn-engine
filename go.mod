@@ -3,7 +3,6 @@ module github.com/longhorn/longhorn-engine
 go 1.13
 
 require (
-	github.com/RoaringBitmap/roaring v0.4.18
 	github.com/c9s/goprocinfo v0.0.0-20190309065803-0b2ad9ac246b // indirect
 	github.com/docker/go-units v0.3.3
 	github.com/fatih/color v1.7.0 // indirect
@@ -12,9 +11,9 @@ require (
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.0 // indirect
-	github.com/longhorn/backupstore v0.0.0-20191024011200-18aa87a9e271
-	github.com/longhorn/go-iscsi-helper v0.0.0-20191114213333-9143c9e5f2f6
-	github.com/longhorn/sparse-tools v0.0.0-20191018221755-2c0ba6f832b2
+	github.com/longhorn/backupstore v0.0.0-20200604031945-5030ff45d833
+	github.com/longhorn/go-iscsi-helper v0.0.0-20200601183015-ca8b762c2f38
+	github.com/longhorn/sparse-tools v0.0.0-20191231185723-50ffab4d4329
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-runewidth v0.0.5-0.20181218000649-703b5e6b11ae // indirect
 	github.com/moby/moby v1.11.1
@@ -23,7 +22,7 @@ require (
 	github.com/rancher/go-rancher v0.1.1-0.20190307222549-9756097e5e4c
 	github.com/satori/go.uuid v1.0.0
 	github.com/sirupsen/logrus v1.4.1
-	github.com/tinylib/msgp v1.1.1-0.20190612170807-0573788bc2a8 // indirect
+	github.com/stretchr/testify v1.3.0 // indirect
 	github.com/urfave/cli v1.22.1
 	golang.org/x/net v0.0.0-20190522155817-f3200d17e092
 	golang.org/x/sys v0.0.0-20190524152521-dbbf3f1254d4

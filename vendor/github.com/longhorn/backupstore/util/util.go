@@ -70,12 +70,44 @@ func Now() string {
 	return time.Now().UTC().Format(time.RFC3339)
 }
 
+func UnorderedEqual(x, y []string) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	known := make(map[string]struct{})
+	for _, value := range x {
+		known[value] = struct{}{}
+	}
+	for _, value := range y {
+		if _, present := known[value]; !present {
+			return false
+		}
+	}
+	return true
+}
+
+func Filter(elements []string, predicate func(string) bool) []string {
+	var filtered []string
+	for _, elem := range elements {
+		if predicate(elem) {
+			filtered = append(filtered, elem)
+		}
+	}
+	return filtered
+}
+
 func ExtractNames(names []string, prefix, suffix string) ([]string, error) {
 	result := []string{}
 	for i := range names {
 		f := names[i]
 		// Remove additional slash if exists
 		f = strings.TrimLeft(f, "/")
+
+		// Not a backup config file
+		if !strings.HasPrefix(f, prefix) || !strings.HasSuffix(f, suffix) {
+			continue
+		}
+
 		f = strings.TrimPrefix(f, prefix)
 		f = strings.TrimSuffix(f, suffix)
 		if !ValidateName(f) {
@@ -134,7 +166,7 @@ func IsMounted(mountPoint string) bool {
 	}
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
-		if strings.Contains(line, mountPoint) {
+		if strings.Contains(line, " "+mountPoint+" ") {
 			return true
 		}
 	}

@@ -31,6 +31,10 @@ class ControllerClient(object):
         return self.stub.VolumeRevert(controller_pb2.VolumeRevertRequest(
             name=name))
 
+    def volume_expand(self, size):
+        return self.stub.VolumeExpand(controller_pb2.VolumeExpandRequest(
+            size=size))
+
     def replica_list(self):
         cr_list = self.stub.ReplicaList(empty_pb2.Empty()).replicas
         r_list = []
@@ -64,6 +68,13 @@ class ControllerClient(object):
         self.address = address
         self.channel = grpc.insecure_channel(address)
         self.stub = controller_pb2_grpc.ControllerServiceStub(self.channel)
+
+    def volume_frontend_start(self, frontend=""):
+        return self.stub.VolumeFrontendStart(controller_pb2.VolumeFrontendStartRequest(
+            frontend=frontend))
+
+    def volume_frontend_shutdown(self):
+        return self.stub.VolumeFrontendShutdown(empty_pb2.Empty())
 
 
 class ControllerReplicaInfo(object):

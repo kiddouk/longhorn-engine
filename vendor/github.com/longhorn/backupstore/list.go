@@ -2,7 +2,9 @@ package backupstore
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 
+	. "github.com/longhorn/backupstore/logging"
 	"github.com/longhorn/backupstore/util"
 )
 
@@ -32,6 +34,8 @@ type BackupInfo struct {
 	VolumeName    string `json:",omitempty"`
 	VolumeSize    int64  `json:",string,omitempty"`
 	VolumeCreated string `json:",omitempty"`
+
+	Messages map[MessageType]string
 }
 
 func addListVolume(volumeName string, driver BackupStoreDriver, volumeOnly bool) (*VolumeInfo, error) {
@@ -41,11 +45,6 @@ func addListVolume(volumeName string, driver BackupStoreDriver, volumeOnly bool)
 
 	if !util.ValidateName(volumeName) {
 		return nil, fmt.Errorf("Invalid volume name %v", volumeName)
-	}
-
-	backupNames, err := getBackupNamesForVolume(volumeName, driver)
-	if err != nil {
-		return nil, err
 	}
 
 	volume, err := loadVolume(volumeName, driver)
@@ -62,13 +61,32 @@ func addListVolume(volumeName string, driver BackupStoreDriver, volumeOnly bool)
 		return volumeInfo, nil
 	}
 
+	// try to find all backups for this volume
+	backupNames, err := getBackupNamesForVolume(volumeName, driver)
+	if err != nil {
+		volumeInfo.Messages[MessageTypeError] = err.Error()
+		return volumeInfo, nil
+	}
+
 	for _, backupName := range backupNames {
+		var info *BackupInfo
 		backup, err := loadBackup(backupName, volumeName, driver)
 		if err != nil {
-			return nil, err
+			log.WithFields(logrus.Fields{
+				LogFieldReason: LogReasonFallback,
+				LogFieldEvent:  LogEventList,
+				LogFieldObject: LogObjectBackup,
+				LogFieldBackup: backupName,
+				LogFieldVolume: volumeName,
+			}).Warn("Failed to load backup in backupstore")
+			info = failedBackupInfo(backupName, volumeName, driver.GetURL(), err)
+		} else if isBackupInProgress(backup) {
+			// for now we don't return in progress backups to the ui
+			continue
+		} else {
+			info = fillBackupInfo(backup, driver.GetURL())
 		}
-		r := fillBackupInfo(backup, driver.GetURL())
-		volumeInfo.Backups[r.URL] = r
+		volumeInfo.Backups[info.URL] = info
 	}
 	return volumeInfo, nil
 }
@@ -79,24 +97,20 @@ func List(volumeName, destURL string, volumeOnly bool) (map[string]*VolumeInfo, 
 		return nil, err
 	}
 	resp := make(map[string]*VolumeInfo)
-	if volumeName != "" {
+	volumeNames := []string{volumeName}
+	if volumeName == "" {
+		volumeNames, err = getVolumeNames(driver)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for _, volumeName := range volumeNames {
 		volumeInfo, err := addListVolume(volumeName, driver, volumeOnly)
 		if err != nil {
 			return nil, err
 		}
 		resp[volumeName] = volumeInfo
-	} else {
-		volumeNames, err := getVolumeNames(driver)
-		if err != nil {
-			return nil, err
-		}
-		for _, volumeName := range volumeNames {
-			volumeInfo, err := addListVolume(volumeName, driver, volumeOnly)
-			if err != nil {
-				return nil, err
-			}
-			resp[volumeName] = volumeInfo
-		}
 	}
 	return resp, nil
 }
@@ -111,6 +125,16 @@ func fillVolumeInfo(volume *Volume) *VolumeInfo {
 		DataStored:     int64(volume.BlockCount * DEFAULT_BLOCK_SIZE),
 		Messages:       make(map[MessageType]string),
 		Backups:        make(map[string]*BackupInfo),
+	}
+}
+
+func failedBackupInfo(backupName string, volumeName string,
+	destURL string, err error) *BackupInfo {
+	return &BackupInfo{
+		Name:       backupName,
+		URL:        encodeBackupURL(backupName, volumeName, destURL),
+		VolumeName: volumeName,
+		Messages:   map[MessageType]string{MessageTypeError: err.Error()},
 	}
 }
 
@@ -152,7 +176,18 @@ func InspectBackup(backupURL string) (*BackupInfo, error) {
 
 	backup, err := loadBackup(backupName, volumeName, driver)
 	if err != nil {
+		log.WithFields(logrus.Fields{
+			LogFieldReason: LogReasonFallback,
+			LogFieldEvent:  LogEventList,
+			LogFieldObject: LogObjectBackup,
+			LogFieldBackup: backupName,
+			LogFieldVolume: volumeName,
+		}).Info("Failed to load backup in backupstore")
 		return nil, err
+	} else if isBackupInProgress(backup) {
+		// for now we don't return in progress backups to the ui
+		return nil, fmt.Errorf("backup %v is still in progress", backup.Name)
 	}
+
 	return fillFullBackupInfo(backup, volume, driver.GetURL()), nil
 }
